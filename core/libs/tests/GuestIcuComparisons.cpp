@@ -114,7 +114,28 @@ void Boundaries() {
 
 } // namespace
 
+void GuestPointerProbes() {
+    const auto* unreadable = reinterpret_cast<const char16_t*>(0x10);
+    const auto rejected = [](auto call) {
+        try {
+            call();
+        } catch (const std::exception&) {
+            return true;
+        }
+        return false;
+    };
+    Require(rejected([&] { u_strlen_nid_postfix(unreadable); }), "unreadable length source rejected");
+    Require(rejected([&] { u_strcmp_nid_postfix(unreadable, u"a"); }), "unreadable first buffer rejected");
+    Require(rejected([&] { u_strcmp_nid_postfix(u"a", unreadable); }), "unreadable second buffer rejected");
+    Require(rejected([&] { u_strncmp_nid_postfix(unreadable, u"a", 4); }), "unreadable bounded first buffer rejected");
+    Require(rejected([&] { u_memcmp_nid_postfix(u"a", unreadable, 4); }), "unreadable bounded second buffer rejected");
+    Require(rejected([&] { u_memcmpCodePointOrder_nid_postfix(unreadable, u"a", -1); }), "unreadable terminated buffer rejected");
+    Require(rejected([&] { u_memcmpCodePointOrder_nid_postfix(u"a", unreadable, 2); }), "unreadable counted buffer rejected");
+    Require(u_strcmp_nid_postfix(u"ab", u"ab") == 0, "comparison still works after a rejected buffer");
+}
+
 int main() {
     Exhaustive();
     Boundaries();
+    GuestPointerProbes();
 }
